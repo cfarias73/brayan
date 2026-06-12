@@ -1,103 +1,129 @@
-# Parlor
+# BRAYAN
 
-On-device, real-time multimodal AI. Have natural voice and vision conversations with an AI that runs entirely on your machine.
+Asistente de IA multimodal (voz + visión) en el dispositivo. Mantén conversaciones naturales con voz y video con una IA que corre completamente de forma local en tu máquina.
 
-Parlor uses [Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it) for understanding speech and vision, and [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) for text-to-speech. You talk, show your camera, and it talks back, all locally.
+Este proyecto está basado en el repositorio original [Parlor de fikrikarim](https://github.com/fikrikarim/parlor), sirviendo como la base para nuestro desarrollo y optimizaciones.
 
-https://github.com/user-attachments/assets/cb0ffb2e-f84f-48e7-872c-c5f7b5c6d51f
+BRAYAN utiliza [Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it) para el procesamiento y comprensión multimodal (visión y lenguaje) y [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) para la síntesis de voz (Text-to-Speech). Tú hablas, le muestras tu cámara y él te responde hablando, todo de forma 100% local y privada.
 
-> **Research preview.** This is an early experiment. Expect rough edges and bugs.
+---
 
-# Why?
+## Características Principales y Mejoras
 
-I'm [self-hosting a totally free voice AI](https://www.fikrikarim.com/bule-ai-initial-release/) on my home server to help people learn speaking English. It has hundreds of monthly active users, and I've been thinking about how to keep it free while making it sustainable.
+- **Detección de Actividad de Voz (VAD) en el navegador:** Utiliza [Silero VAD](https://github.com/ricky0123/vad) en el cliente. Manos libres, sin necesidad de presionar un botón para hablar.
+- **Bypass de Webcam Virtual:** Implementa un puente WebRTC dinámico que extrae el `getUserMedia` nativo de Chrome para evitar que extensiones de webcam virtual (como *LookGood Live*) bloqueen o eliminen el canal de audio del micrófono.
+- **Arquitectura de Sincronización en GPU:** Procesamiento seguro a través de un ejecutor de hilo único (`ThreadPoolExecutor(max_workers=1)`) en el backend que protege el ciclo de vida de la GPU (Metal/OpenCL) ante recargas rápidas, eliminando los bloqueos (*deadlocks*) permanentes de GPU.
+- **Interrupción por Voz (Barge-in):** Puedes interrumpir a la IA en medio de su respuesta con solo hablarle.
+- **Streaming de audio por oraciones:** El audio comienza a reproducirse progresivamente antes de que termine de generarse la respuesta completa.
 
-The obvious answer: run everything on-device, eliminating any server cost. Six months ago I needed an RTX 5090 to run just the voice models in real-time.
+---
 
-Google just released a super capable small model that I can run on my M3 Pro in real-time, with vision too! Sure you can't do agentic coding with this, but it is a game-changer for people learning a new language. Imagine a few years from now that people can run this locally on their phones. They can point their camera at objects and talk about them. And this model is multi-lingual, so people can always fallback to their native language if they want. This is essentially what OpenAI demoed a few years ago.
+## Requerimientos del Dispositivo
 
-## How it works
+- **Sistema Operativo:** macOS (Apple Silicon M1, M2, M3, M4) o Linux con GPU compatible.
+- **Memoria RAM:** Al menos 3 GB de RAM libre dedicada para el modelo.
+- **Procesador (CPU):** Optimizado para chips de la serie M de Apple (utiliza aceleración Metal GPU de forma nativa) o CPU multinúcleo en Linux.
+- **Almacenamiento:** Aproximadamente 3 GB de espacio libre (los modelos se descargan automáticamente en la primera ejecución: ~2.58 GB para Gemma 4 E2B, más los pesos de TTS de Kokoro).
+- **Python:** Versión 3.12 o superior.
 
-```
-Browser (mic + camera)
-    │
-    │  WebSocket (audio PCM + JPEG frames)
-    ▼
-FastAPI server
-    ├── Gemma 4 E2B via LiteRT-LM (GPU)  →  understands speech + vision
-    └── Kokoro TTS (MLX on Mac, ONNX on Linux)  →  speaks back
-    │
-    │  WebSocket (streamed audio chunks)
-    ▼
-Browser (playback + transcript)
-```
+---
 
-- **Voice Activity Detection** in the browser ([Silero VAD](https://github.com/ricky0123/vad)). Hands-free, no push-to-talk.
-- **Barge-in.** Interrupt the AI mid-sentence by speaking.
-- **Sentence-level TTS streaming.** Audio starts playing before the full response is generated.
+## Instrucciones de Instalación y Uso rápido
 
-## Requirements
-
-- Python 3.12+
-- macOS with Apple Silicon, or Linux with a supported GPU
-- ~3 GB free RAM for the model
-
-## Quick start
-
+### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/fikrikarim/parlor.git
-cd parlor
+git clone https://github.com/cfarias73/parlor2.git
+cd parlor2
+```
 
-# Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
+### 2. Instalar el gestor de paquetes `uv` (Recomendado)
+`uv` es un instalador y gestor de paquetes de Python ultrarrápido escrito en Rust.
+- **En macOS/Linux:**
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
 
+### 3. Sincronizar dependencias e inicializar
+Entra al directorio `src/` e instala el entorno virtual con todas las dependencias requeridas:
+```bash
 cd src
 uv sync
+```
+
+### 4. Lanzar el servidor
+Ejecuta el servidor de desarrollo en puerto local:
+```bash
 uv run server.py
 ```
+*El servidor leerá la configuración del puerto desde el archivo `.env` (por defecto `3436`).*
 
-Open [http://localhost:8000](http://localhost:8000), grant camera and microphone access, and start talking.
+### 5. Abrir en el navegador
+Abre tu navegador (Google Chrome recomendado) en:
+[http://localhost:3436](http://localhost:3436)
 
-Models are downloaded automatically on first run (~2.6 GB for Gemma 4 E2B, plus TTS models).
+Concede permisos de acceso a la cámara y al micrófono cuando el sistema y el navegador lo soliciten. ¡Y listo! Comienza a hablarle en español o inglés (puedes alternar el idioma en el selector inferior).
 
-## Configuration
+---
 
-| Variable     | Default                        | Description                                    |
-| ------------ | ------------------------------ | ---------------------------------------------- |
-| `MODEL_PATH` | auto-download from HuggingFace | Path to a local `gemma-4-E2B-it.litertlm` file |
-| `PORT`       | `8000`                         | Server port                                    |
+## Lanzador de Escritorio (macOS)
 
-## Performance (Apple M3 Pro)
+El repositorio incluye un script lanzador de acceso rápido `Parlor.command`. 
+Para usarlo:
+1. Asegúrate de mover la carpeta del proyecto a la ubicación deseada.
+2. Abre el archivo `Parlor.command` con un editor de texto y actualiza la ruta en la línea 3 para que apunte al directorio `src/` de tu nueva ubicación.
+3. Haz doble clic en el script para iniciar el servidor y abrir el navegador web automáticamente en un solo paso.
 
-| Stage                            | Time          |
-| -------------------------------- | ------------- |
-| Speech + vision understanding    | ~1.8-2.2s     |
-| Response generation (~25 tokens) | ~0.3s         |
-| Text-to-speech (1-3 sentences)   | ~0.3-0.7s     |
-| **Total end-to-end**             | **~2.5-3.0s** |
+---
 
-Decode speed: ~83 tokens/sec on GPU (Apple M3 Pro).
+## Configuración y Variables de Entorno
 
-## Project structure
+Puedes configurar las variables creando un archivo `.env` en la carpeta raíz o dentro de `src/`:
+
+| Variable | Por defecto | Descripción |
+| :--- | :--- | :--- |
+| `PORT` | `3436` | Puerto de escucha del servidor FastAPI. |
+| `MODEL_PATH` | Descarga automática | Ruta local alternativa hacia el archivo del modelo `gemma-4-E2B-it.litertlm`. |
+
+---
+
+## Rendimiento de Referencia (Apple M3 Pro)
+
+| Fase de Procesamiento | Tiempo estimado |
+| :--- | :--- |
+| Comprensión de voz y visión | ~1.8 - 2.2s |
+| Generación de respuesta (~25 tokens) | ~0.3s |
+| Síntesis de voz a texto (TTS) | ~0.3 - 0.7s |
+| **Latencia Total End-to-End** | **~2.5 - 3.0s** |
+
+*Velocidad de descodificación de texto: ~83 tokens/segundo en GPU de M3 Pro.*
+
+---
+
+## Estructura del Proyecto
 
 ```
-src/
-├── server.py              # FastAPI WebSocket server + Gemma 4 inference
-├── tts.py                 # Platform-aware TTS (MLX on Mac, ONNX on Linux)
-├── index.html             # Frontend UI (VAD, camera, audio playback)
-├── pyproject.toml         # Dependencies
-└── benchmarks/
-    ├── bench.py           # End-to-end WebSocket benchmark
-    └── benchmark_tts.py   # TTS backend comparison
+parlor2/
+├── src/
+│   ├── server.py        # Servidor FastAPI WebSocket e inferencia de Gemma 4
+│   ├── tts.py           # Conexión de TTS (MLX en Mac, ONNX en Linux)
+│   ├── index.html       # Interfaz de usuario (VAD, webcam, reproductor de audio)
+│   ├── pyproject.toml   # Definición de dependencias
+│   └── benchmarks/      # Scripts de pruebas y evaluación de rendimiento
+└── Parlor.command       # Lanzador rápido para macOS
 ```
 
-## Acknowledgments
+---
 
-- [Gemma 4](https://ai.google.dev/gemma) by Google DeepMind
-- [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) by Google AI Edge
-- [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS by Hexgrad
-- [Silero VAD](https://github.com/snakers4/silero-vad) for browser voice activity detection
+## Agradecimientos
 
-## License
+- Repo base: [Parlor de fikrikarim](https://github.com/fikrikarim/parlor)
+- [Gemma 4](https://ai.google.dev/gemma) desarrollado por Google DeepMind.
+- [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) por Google AI Edge.
+- [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS por Hexgrad.
+- [Silero VAD](https://github.com/snakers4/silero-vad) para la detección de voz en el navegador.
 
-[Apache 2.0](LICENSE)
+---
+
+## Licencia
+
+Este proyecto está licenciado bajo la Licencia **Apache 2.0**. Consulta el archivo `LICENSE` para más detalles.
