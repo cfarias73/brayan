@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Parlor</title>
+<title>BRAYAN</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
@@ -411,6 +411,99 @@
     50% { opacity: 0.4; transform: scale(0.8); }
   }
 
+  .app-layout {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    max-width: 1200px;
+    flex: 1;
+    min-height: 0;
+    gap: 20px;
+    padding: 0 10px;
+    z-index: 2;
+  }
+  .notepad-panel {
+    flex: 0.8;
+    display: flex;
+    flex-direction: column;
+    background: var(--c-surface);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 16px;
+    min-height: 0;
+    margin: 20px 0 16px;
+    transition: border-color 0.3s ease;
+  }
+  .notepad-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .notepad-header h2 {
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--c-text-bright);
+  }
+  #notepadTextarea {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    color: var(--c-text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    padding: 12px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+  }
+  #notepadTextarea:focus {
+    border-color: rgba(129, 140, 248, 0.3);
+  }
+  .notepad-status {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--c-text-dim);
+    font-style: italic;
+    flex-shrink: 0;
+  }
+  .copy-bubble-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0;
+  }
+  .msg.assistant:hover .copy-bubble-btn {
+    opacity: 1;
+  }
+  .copy-bubble-btn:hover {
+    color: var(--c-text-bright);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  @media (max-width: 768px) {
+    .app-layout {
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .notepad-panel {
+      margin-top: 0;
+      max-height: 250px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -418,38 +511,59 @@
 <header>
   <div class="logo">
     <div class="logo-mark"></div>
-    <h1>Parlor</h1>
+    <h1>BRAYAN</h1>
   </div>
   <span class="model-label">Gemma 4 E2B</span>
   <div id="status" class="status-pill disconnected">Disconnected</div>
 </header>
 
-<div class="portal-stack">
-  <!-- Webcam viewport with glow layers -->
-  <div id="viewportWrap" class="viewport-wrap loading">
-    <div class="viewport-glow"></div>
-    <video id="video" autoplay muted playsinline></video>
-  </div>
-
-  <!-- Audio waveform visualizer -->
-  <div class="waveform-wrap">
-    <canvas id="waveform"></canvas>
-  </div>
-
-  <!-- Transcript -->
-  <div id="messages" class="transcript"></div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <button id="cameraToggle" class="ctrl-btn active">Camera On</button>
-    <div class="state-indicator">
-      <div id="stateDot" class="dot loading"></div>
-      <span id="stateText">Loading...</span>
+<div class="app-layout">
+  <div class="portal-stack">
+    <!-- Webcam viewport with glow layers -->
+    <div id="viewportWrap" class="viewport-wrap loading">
+      <div class="viewport-glow"></div>
+      <video id="video" autoplay muted playsinline></video>
     </div>
-    <span class="on-device-pill">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M5 4V3a3 3 0 0 1 6 0v1"/></svg>
-      On-device
-    </span>
+
+    <!-- Audio waveform visualizer -->
+    <div class="waveform-wrap">
+      <canvas id="waveform"></canvas>
+    </div>
+
+    <!-- Transcript -->
+    <div id="messages" class="transcript"></div>
+
+    <!-- Text Input (Fallback/Alternative) -->
+    <div class="text-input-wrap" style="width: 100%; max-width: 640px; margin: 12px 0 4px; display: flex; gap: 8px; flex-shrink: 0; z-index: 2;">
+      <input type="text" id="chatInput" placeholder="Escribe un mensaje aquí..." style="flex: 1; background: var(--c-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 14px; color: var(--c-text); font-family: var(--font-body); font-size: 13px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='rgba(129, 140, 248, 0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.06)'" />
+      <button id="sendBtn" class="ctrl-btn" style="padding: 10px 20px;">Enviar</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="cameraToggle" class="ctrl-btn active">Cámara Encendida</button>
+      <select id="langSelect" class="ctrl-btn" style="background: var(--c-surface); color: var(--c-text); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 8px 12px; outline: none; cursor: pointer;">
+        <option value="es" selected>Español 🇪🇸</option>
+        <option value="en">English 🇺🇸</option>
+      </select>
+      <div class="state-indicator">
+        <div id="stateDot" class="dot loading"></div>
+        <span id="stateText">Loading...</span>
+      </div>
+      <span class="on-device-pill">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M5 4V3a3 3 0 0 1 6 0v1"/></svg>
+        On-device
+      </span>
+    </div>
+  </div>
+
+  <div class="notepad-panel" id="notepadPanel">
+    <div class="notepad-header">
+      <h2>Borrador / Draft</h2>
+      <button id="copyNotepadBtn" class="ctrl-btn">Copiar todo</button>
+    </div>
+    <textarea id="notepadTextarea" placeholder="Los borradores generados por la IA aparecerán aquí..." readonly></textarea>
+    <div id="notepadStatus" class="notepad-status">Ningún borrador guardado en el Escritorio aún.</div>
   </div>
 </div>
 
@@ -466,6 +580,7 @@ const waveformCtx = waveformCanvas.getContext('2d');
 
 let ws, mediaStream, myvad;
 let cameraEnabled = true;
+let hasMic = true;
 let audioCtx, currentSource;
 let state = 'loading';
 let ignoreIncomingAudio = false;
@@ -562,12 +677,16 @@ function updateSpeakingGlow() {
 }
 
 // ── State Machine ──
+const isSpanish = () => $('langSelect').value === 'es';
+
 function setState(newState) {
   state = newState;
 
   // Update state indicator
   stateDot.className = `dot ${newState}`;
-  const labels = { loading: 'Loading...', listening: 'Listening', processing: 'Thinking...', speaking: 'Speaking' };
+  const labelsEn = { loading: 'Loading...', listening: hasMic ? 'Listening' : 'Ready (Text Only)', processing: 'Thinking...', speaking: 'Speaking' };
+  const labelsEs = { loading: 'Cargando...', listening: hasMic ? 'Escuchando' : 'Listo (Solo Texto)', processing: 'Pensando...', speaking: 'Hablando' };
+  const labels = isSpanish() ? labelsEs : labelsEn;
   stateText.textContent = labels[newState] || newState;
 
   // Update viewport glow class
@@ -581,7 +700,7 @@ function setState(newState) {
 
   // Update CSS custom properties for state color (must use resolved values, not nested var())
   const stateVars = {
-    listening: ['#4ade80', 'rgba(74,222,128,0.12)'],
+    listening: hasMic ? ['#4ade80', 'rgba(74,222,128,0.12)'] : ['#3a3d46', 'rgba(58,61,70,0.12)'],
     processing: ['#f59e0b', 'rgba(245,158,11,0.12)'],
     speaking: ['#818cf8', 'rgba(129,140,248,0.12)'],
     loading: ['#3a3d46', 'rgba(58,61,70,0.12)'],
@@ -595,17 +714,27 @@ function setState(newState) {
 
   // Raise VAD threshold during speaking to reduce echo false triggers
   if (myvad) {
-    myvad.setOptions({ positiveSpeechThreshold: newState === 'speaking' ? 0.92 : 0.5 });
+    try {
+      myvad.setOptions({ positiveSpeechThreshold: newState === 'speaking' ? 0.92 : 0.5 });
+    } catch (err) {
+      console.warn('Failed to set VAD options:', err);
+    }
   }
 
   // Connect/disconnect mic analyser based on state
-  if (newState === 'listening' && mediaStream && audioCtx && analyser) {
-    if (!micSource) {
-      micSource = audioCtx.createMediaStreamSource(mediaStream);
+  try {
+    if (newState === 'listening' && mediaStream && audioCtx && analyser && mediaStream.getAudioTracks().length > 0) {
+      if (!micSource) {
+        micSource = audioCtx.createMediaStreamSource(mediaStream);
+      }
+      if (micSource) {
+        micSource.connect(analyser);
+      }
+    } else if (micSource && newState !== 'listening') {
+      micSource.disconnect(analyser);
     }
-    try { micSource.connect(analyser); } catch {}
-  } else if (micSource && newState !== 'listening') {
-    try { micSource.disconnect(analyser); } catch {}
+  } catch (err) {
+    console.warn('Failed to connect/disconnect mic source:', err);
   }
 }
 
@@ -649,40 +778,145 @@ function connect() {
       streamTtsTime = msg.tts_time;
       const meta = messagesDiv.querySelector('.msg.assistant:last-child .meta');
       if (meta) meta.textContent += ` · TTS ${msg.tts_time}s`;
+    } else if (msg.type === 'file_written') {
+      document.getElementById('notepadTextarea').value = msg.content;
+      document.getElementById('notepadStatus').textContent = isSpanish() ? 
+        `Guardado en el Escritorio: ${msg.filename}` : 
+        `Saved to Desktop: ${msg.filename}`;
+      
+      const panel = document.getElementById('notepadPanel');
+      panel.style.borderColor = '#818cf8';
+      setTimeout(() => { panel.style.borderColor = 'rgba(255,255,255,0.06)'; }, 1000);
     }
   };
 }
 
-function setStatus(cls, text) { statusEl.className = `status-pill ${cls}`; statusEl.textContent = text; }
+function setStatus(cls, text) {
+  statusEl.className = `status-pill ${cls}`;
+  if (cls === 'connected') {
+    if (!hasMic) {
+      statusEl.textContent = isSpanish() ? 'Conectado (Sin Micrófono)' : 'Connected (No Mic)';
+    } else {
+      statusEl.textContent = isSpanish() ? 'Conectado' : 'Connected';
+    }
+  } else if (cls === 'disconnected') {
+    statusEl.textContent = isSpanish() ? 'Desconectado' : 'Disconnected';
+  } else if (cls === 'processing') {
+    statusEl.textContent = isSpanish() ? 'Procesando' : 'Processing';
+  } else {
+    statusEl.textContent = text;
+  }
+}
 
-// ── Camera ──
-async function startCamera() {
+let nativeGUM = null;
+function getNativeGUM() {
+  if (nativeGUM) return nativeGUM;
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' },
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    video.srcObject = mediaStream;
-    return;
-  } catch (e) { console.warn('Video+audio failed:', e.message); }
+    let iframe = document.getElementById('native-gum-iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'native-gum-iframe';
+      iframe.setAttribute('allow', 'camera *; microphone *');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+    const gum = iframe.contentWindow.navigator.mediaDevices.getUserMedia;
+    if (gum) {
+      nativeGUM = gum.bind(iframe.contentWindow.navigator.mediaDevices);
+      console.log('Successfully retrieved native getUserMedia from persistent iframe');
+    }
+  } catch (err) {
+    console.warn('Failed to retrieve native getUserMedia from iframe:', err);
+  }
+  if (!nativeGUM) {
+    nativeGUM = navigator.mediaDevices.getUserMedia.bind(navigator.navigator.mediaDevices || navigator.mediaDevices);
+  }
+  return nativeGUM;
+}
 
-  const streams = await Promise.allSettled([
-    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } }),
-    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }),
-  ]);
-  mediaStream = new MediaStream();
-  streams.forEach(r => { if (r.status === 'fulfilled') r.value.getTracks().forEach(t => mediaStream.addTrack(t)); });
-  if (mediaStream.getVideoTracks().length) video.srcObject = mediaStream;
-  if (!mediaStream.getAudioTracks().length) { cameraEnabled = false; }
+async function startCamera() {
+  const tryGUM = async (constraints) => {
+    try {
+      console.log('Trying GUM with:', JSON.stringify(constraints));
+      const gum = getNativeGUM();
+      return await gum(constraints);
+    } catch (err) {
+      console.warn('GUM failed for constraints:', JSON.stringify(constraints), err.message);
+      return null;
+    }
+  };
+
+  // Try combined stream first with full options
+  let stream = await tryGUM({
+    video: { width: 640, height: 480, facingMode: 'user' },
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+
+  // Try simpler audio constraints
+  if (!stream) {
+    stream = await tryGUM({
+      video: { width: 640, height: 480, facingMode: 'user' },
+      audio: true
+    });
+  }
+
+  // Try absolute simplest combined constraints
+  if (!stream) {
+    stream = await tryGUM({
+      video: true,
+      audio: true
+    });
+  }
+
+  // If combined failed, try separately
+  if (!stream) {
+    console.log('Combined streams failed. Trying separate audio/video requests...');
+    const videoStream = await tryGUM({ video: { width: 640, height: 480, facingMode: 'user' } }) || await tryGUM({ video: true });
+    const audioStream = await tryGUM({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }) || await tryGUM({ audio: true });
+    
+    stream = new MediaStream();
+    if (videoStream) {
+      videoStream.getVideoTracks().forEach(t => stream.addTrack(t));
+    }
+    if (audioStream) {
+      audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+    }
+  }
+
+  mediaStream = stream;
+  
+  if (mediaStream && mediaStream.getVideoTracks().length > 0) {
+    video.srcObject = mediaStream;
+    cameraEnabled = true;
+    console.log('Successfully bound video track');
+  } else {
+    cameraEnabled = false;
+    console.warn('No video tracks bound');
+  }
+
+  if (mediaStream && mediaStream.getAudioTracks().length > 0) {
+    console.log('Successfully acquired audio tracks count:', mediaStream.getAudioTracks().length);
+  } else {
+    console.warn('No audio tracks available in mediaStream');
+  }
 }
 
 function captureFrame() {
-  if (!cameraEnabled || !video.videoWidth) return null;
-  const canvas = document.createElement('canvas');
-  const scale = 320 / video.videoWidth;
-  canvas.width = 320; canvas.height = video.videoHeight * scale;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+  try {
+    if (!cameraEnabled || !video.videoWidth || !video.videoHeight) return null;
+    const scale = 320 / video.videoWidth;
+    const canvasHeight = video.videoHeight * scale;
+    if (isNaN(canvasHeight) || !isFinite(canvasHeight) || canvasHeight <= 0) return null;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; 
+    canvas.height = canvasHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+  } catch (err) {
+    console.warn('Failed to capture video frame:', err);
+    return null;
+  }
 }
 
 // ── VAD Handlers ──
@@ -714,10 +948,11 @@ function handleSpeechEnd(audio) {
   const imageBase64 = captureFrame();
 
   setState('processing');
-  setStatus('processing', 'Processing');
-  addMessage('user', '<span class="loading-dots"><span></span><span></span><span></span></span>', imageBase64 ? 'with camera' : '');
+  setStatus('processing', isSpanish() ? 'Procesando' : 'Processing');
+  const userMeta = isSpanish() ? (imageBase64 ? 'con cámara' : '') : (imageBase64 ? 'with camera' : '');
+  addMessage('user', '<span class="loading-dots"><span></span><span></span><span></span></span>', userMeta);
 
-  const payload = { audio: wavBase64 };
+  const payload = { audio: wavBase64, language: $('langSelect').value };
   if (imageBase64) payload.image = imageBase64;
   ws.send(JSON.stringify(payload));
 }
@@ -813,7 +1048,26 @@ function queueAudioChunk(base64Pcm) {
 function addMessage(role, text, meta) {
   const div = document.createElement('div');
   div.className = `msg ${role}`;
-  div.innerHTML = `${text}${meta ? `<div class="meta">${meta}</div>` : ''}`;
+  
+  let html = text;
+  if (meta) {
+    html += `<div class="meta">${meta}</div>`;
+  }
+  
+  if (role === 'assistant') {
+    // Strips HTML tags so only pure text is copied
+    const rawText = text.replace(/<[^>]*>/g, '');
+    // Escape quotes for JS inline onclick function string
+    const escapedText = rawText.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+    div.style.position = 'relative';
+    html += `
+      <button class="copy-bubble-btn" title="Copiar texto" onclick="navigator.clipboard.writeText(\`${escapedText}\`)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    `;
+  }
+  
+  div.innerHTML = html;
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
@@ -821,34 +1075,132 @@ function addMessage(role, text, meta) {
 cameraToggle.addEventListener('click', () => {
   cameraEnabled = !cameraEnabled;
   cameraToggle.classList.toggle('active', cameraEnabled);
-  cameraToggle.textContent = cameraEnabled ? 'Camera On' : 'Camera Off';
+  cameraToggle.textContent = cameraEnabled ? 
+    (isSpanish() ? 'Cámara Encendida' : 'Camera On') : 
+    (isSpanish() ? 'Cámara Apagada' : 'Camera Off');
   video.style.opacity = cameraEnabled ? 1 : 0.3;
 });
+
+$('langSelect').addEventListener('change', () => {
+  // Update state text
+  setState(state);
+  // Update status text
+  if (statusEl.classList.contains('connected')) {
+    setStatus('connected');
+  } else if (statusEl.classList.contains('processing')) {
+    setStatus('processing');
+  } else {
+    setStatus('disconnected');
+  }
+  // Update camera button text
+  cameraToggle.textContent = cameraEnabled ? 
+    (isSpanish() ? 'Cámara Encendida' : 'Camera On') : 
+    (isSpanish() ? 'Cámara Apagada' : 'Camera Off');
+  
+  // Update notepad texts
+  document.querySelector('.notepad-header h2').textContent = isSpanish() ? 'Borrador / Draft' : 'Draft / Borrador';
+  $('copyNotepadBtn').textContent = isSpanish() ? 'Copiar todo' : 'Copy all';
+  
+  const notepadStatus = $('notepadStatus');
+  if (notepadStatus.textContent.includes('Escritorio') || notepadStatus.textContent.includes('Desktop')) {
+    const isSaved = notepadStatus.textContent.includes(':');
+    if (isSaved) {
+      const filename = notepadStatus.textContent.split(': ')[1];
+      notepadStatus.textContent = isSpanish() ? `Guardado en el Escritorio: ${filename}` : `Saved to Desktop: ${filename}`;
+    } else {
+      notepadStatus.textContent = isSpanish() ? 'Ningún borrador guardado en el Escritorio aún.' : 'No drafts saved to the Desktop yet.';
+    }
+  }
+});
+
+$('copyNotepadBtn').addEventListener('click', () => {
+  const text = $('notepadTextarea').value;
+  if (text) {
+    navigator.clipboard.writeText(text);
+    const originalText = $('copyNotepadBtn').textContent;
+    $('copyNotepadBtn').textContent = isSpanish() ? '¡Copiado!' : 'Copied!';
+    setTimeout(() => {
+      $('copyNotepadBtn').textContent = originalText;
+    }, 1500);
+  }
+});
+
+$('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendTextMessage();
+});
+$('sendBtn').addEventListener('click', sendTextMessage);
+
+function sendTextMessage() {
+  const text = $('chatInput').value.trim();
+  if (!text) return;
+  $('chatInput').value = '';
+
+  setState('processing');
+  setStatus('processing', isSpanish() ? 'Procesando' : 'Processing');
+  addMessage('user', text);
+
+  const payload = { text: text, language: $('langSelect').value };
+  const imageBase64 = captureFrame();
+  if (imageBase64) payload.image = imageBase64;
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
 
 // ── Init ──
 async function init() {
   initWaveformCanvas();
   window.addEventListener('resize', initWaveformCanvas);
 
+  // Enumerate input devices for debugging
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log("=== ENUMERATED DEVICES ===");
+    devices.forEach(d => {
+      console.log(`Device: kind=${d.kind}, label=${d.label || '(no label - permission blocked?)'}, id=${d.deviceId}`);
+    });
+    console.log("==========================");
+  } catch (err) {
+    console.error("enumerateDevices failed:", err);
+  }
+
   await startCamera();
   connect();
 
   // Initialize VAD with shared mic stream
-  myvad = await vad.MicVAD.new({
-    getStream: async () => new MediaStream(mediaStream.getAudioTracks()),
-    positiveSpeechThreshold: 0.5,
-    negativeSpeechThreshold: 0.25,
-    redemptionMs: 600,
-    minSpeechMs: 300,
-    preSpeechPadMs: 300,
-    onSpeechStart: handleSpeechStart,
-    onSpeechEnd: handleSpeechEnd,
-    onVADMisfire: () => { console.log('VAD misfire (too short)'); },
-    onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/",
-    baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/",
-  });
-
-  myvad.start();
+  try {
+    if (!mediaStream || !mediaStream.getAudioTracks || !mediaStream.getAudioTracks().length) {
+      throw new Error(isSpanish() ? 'No se detectó micrófono activo.' : 'No active microphone detected.');
+    }
+    myvad = await vad.MicVAD.new({
+      getStream: async () => new MediaStream(mediaStream.getAudioTracks()),
+      positiveSpeechThreshold: 0.5,
+      negativeSpeechThreshold: 0.25,
+      redemptionMs: 600,
+      minSpeechMs: 300,
+      preSpeechPadMs: 300,
+      onSpeechStart: handleSpeechStart,
+      onSpeechEnd: handleSpeechEnd,
+      onVADMisfire: () => { console.log('VAD misfire (too short)'); },
+      onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/",
+      baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/",
+    });
+    myvad.start();
+    hasMic = true;
+    console.log('VAD initialized and listening');
+  } catch (err) {
+    console.error('VAD init failed:', err);
+    hasMic = false;
+    
+    // Update placeholder to inform the user
+    const chatInput = $('chatInput');
+    if (chatInput) {
+      chatInput.placeholder = isSpanish() ? 
+        'Micrófono no disponible. Escribe un mensaje aquí...' : 
+        'Microphone unavailable. Type a message here...';
+    }
+  }
 
   // Init audio context on first user gesture for mic visualizer
   // (browsers require user interaction to create AudioContext)
@@ -867,8 +1219,6 @@ async function init() {
 
   // Start waveform loop
   drawWaveform();
-
-  console.log('VAD initialized and listening');
 }
 
 init();

@@ -17,7 +17,7 @@ class TTSBackend:
 
     sample_rate: int = 24000
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
+    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1, lang_code: str = "en") -> np.ndarray:
         raise NotImplementedError
 
 
@@ -32,8 +32,10 @@ class MLXBackend(TTSBackend):
         # Warmup: triggers pipeline init (phonemizer, spacy, etc.)
         list(self._model.generate(text="Hello", voice="af_heart", speed=1.0))
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
-        results = list(self._model.generate(text=text, voice=voice, speed=speed))
+    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1, lang_code: str = "en") -> np.ndarray:
+        results = list(self._model.generate(text=text, voice=voice, speed=speed, lang_code=lang_code))
+        if not results:
+            return np.array([], dtype=np.float32)
         return np.concatenate([np.array(r.audio) for r in results])
 
 
@@ -50,8 +52,9 @@ class ONNXBackend(TTSBackend):
         self._model = kokoro_onnx.Kokoro(model_path, voices_path)
         self.sample_rate = 24000
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
-        pcm, _sr = self._model.create(text, voice=voice, speed=speed)
+    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1, lang_code: str = "en") -> np.ndarray:
+        lang = "en-us" if lang_code == "en" else lang_code
+        pcm, _sr = self._model.create(text, voice=voice, speed=speed, lang=lang)
         return pcm
 
 

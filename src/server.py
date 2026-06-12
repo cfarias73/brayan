@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,14 +38,20 @@ MODEL_PATH = resolve_model_path()
 SYSTEM_PROMPT = (
     "You are a friendly, conversational AI assistant. The user is talking to you "
     "through a microphone and showing you their camera. "
-    "You MUST always use the respond_to_user tool to reply. "
-    "First transcribe exactly what the user said, then write your response."
+    "You MUST always use the respond_to_user tool to reply to the user. "
+    "If the user asks you to open a website, search something on the web, or check a price, "
+    "you MUST call the open_web_browser tool and/or search_web_for_prices tool as needed, "
+    "and then call respond_to_user. Do not wait for confirmation to open or search. "
+    "If you write or suggest any email, letter, message, or document, you MUST "
+    "immediately call the write_draft_file tool first to write it to their Desktop (e.g. 'borrador.txt'), "
+    "and then call respond_to_user. Do not wait for confirmation to save it."
 )
 
 SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
 
 engine = None
 tts_backend = None
+engine_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def load_models():
@@ -64,7 +71,7 @@ def load_models():
 
 @asynccontextmanager
 async def lifespan(app):
-    await asyncio.get_event_loop().run_in_executor(None, load_models)
+    await asyncio.get_event_loop().run_in_executor(engine_executor, load_models)
     yield
 
 
@@ -79,12 +86,21 @@ def split_sentences(text: str) -> list[str]:
 
 @app.get("/")
 async def root():
-    return HTMLResponse(content=(Path(__file__).parent / "index.html").read_text())
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+    return HTMLResponse(
+        content=(Path(__file__).parent / "index.html").read_text(),
+        headers=headers
+    )
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    loop = asyncio.get_running_loop()
 
     # Per-connection tool state captured via closure
     tool_result = {}
@@ -100,11 +116,103 @@ async def websocket_endpoint(ws: WebSocket):
         tool_result["response"] = response
         return "OK"
 
-    conversation = engine.create_conversation(
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}],
-        tools=[respond_to_user],
-    )
-    conversation.__enter__()
+    def write_draft_file(filename: str, content: str) -> str:
+        """Create or write a text file with the drafted email, letter, or document to the user's Desktop.
+
+        Args:
+            filename: The name of the file to create (e.g. 'borrador_correo.txt' or 'carta_pago.txt').
+            content: The complete text content of the email, letter, or document.
+        """
+        try:
+            desktop_path = Path.home() / "Desktop"
+            file_path = desktop_path / filename
+            file_path.write_text(content)
+            
+            # Send notification back to WebSocket client thread-safely
+            asyncio.run_coroutine_threadsafe(
+                ws.send_text(json.dumps({
+                    "type": "file_written",
+                    "filename": filename,
+                    "filepath": str(file_path),
+                    "content": content
+                })),
+                loop
+            )
+            return f"Successfully saved draft to {file_path}"
+        except Exception as e:
+            return f"Error saving file: {str(e)}"
+
+    def open_web_browser(url: str) -> str:
+        """Open the web browser to the specified URL.
+
+        Args:
+            url: The URL to open (e.g. 'https://www.walmart.com/search?q=milk').
+        """
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            return f"Successfully opened browser to {url}"
+        except Exception as e:
+            return f"Error opening browser: {str(e)}"
+
+    def search_web_for_prices(query: str) -> str:
+        """Search the web for product prices, comparison details, or other information.
+
+        Args:
+            query: The search term or query (e.g. 'walmart milk price' or 'precio de la leche walmart').
+        """
+        try:
+            import urllib.request
+            import urllib.parse
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            url = 'https://search.yahoo.com/search?p=' + urllib.parse.quote_plus(query)
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req) as response:
+                html = response.read().decode('utf-8')
+            
+            items = html.split('<li')
+            results = []
+            for item in items:
+                if 'algo-sr' not in item:
+                    continue
+                
+                href_match = re.search(r'href="([^"]+)"', item)
+                title_match = re.search(r'class="title[^"]*">.*?<span[^>]*>(.*?)</span>', item, re.DOTALL)
+                snippet_match = re.search(r'<div class="compText[^"]*">.*?<p[^>]*>(.*?)</p>', item, re.DOTALL)
+                
+                if href_match and title_match:
+                    href = href_match.group(1)
+                    title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                    
+                    ru_match = re.search(r'/RU=([^/&]+)', href)
+                    if ru_match:
+                        decoded_url = urllib.parse.unquote(ru_match.group(1))
+                    else:
+                        decoded_url = href
+                        
+                    snippet = ""
+                    if snippet_match:
+                        snippet = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
+                        
+                    results.append(f"Title: {title}\nURL: {decoded_url}\nSnippet: {snippet}")
+            
+            if not results:
+                return "No search results found."
+            return "\n\n".join(results[:5])
+        except Exception as e:
+            return f"Error searching: {str(e)}"
+
+    def init_conversation():
+        conv = engine.create_conversation(
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}],
+            tools=[respond_to_user, write_draft_file, open_web_browser, search_web_for_prices],
+        )
+        conv.__enter__()
+        return conv
+
+    conversation = await asyncio.get_event_loop().run_in_executor(engine_executor, init_conversation)
 
     interrupted = asyncio.Event()
     msg_queue = asyncio.Queue()
@@ -133,6 +241,8 @@ async def websocket_endpoint(ws: WebSocket):
 
             interrupted.clear()
 
+            language = msg.get("language", "en")
+
             content = []
             if msg.get("audio"):
                 content.append({"type": "audio", "blob": msg["audio"]})
@@ -140,19 +250,29 @@ async def websocket_endpoint(ws: WebSocket):
                 content.append({"type": "image", "blob": msg["image"]})
 
             if msg.get("audio") and msg.get("image"):
-                content.append({"type": "text", "text": "The user just spoke to you (audio) while showing their camera (image). Respond to what they said, referencing what you see if relevant."})
+                if language == "es":
+                    content.append({"type": "text", "text": "El usuario te acaba de hablar (audio) mientras te muestra su cámara (imagen). Responde a lo que dijo, haciendo referencia a lo que ves si es relevante. Responde en español."})
+                else:
+                    content.append({"type": "text", "text": "The user just spoke to you (audio) while showing their camera (image). Respond to what they said, referencing what you see if relevant."})
             elif msg.get("audio"):
-                content.append({"type": "text", "text": "The user just spoke to you. Respond to what they said."})
+                if language == "es":
+                    content.append({"type": "text", "text": "El usuario te acaba de hablar. Responde a lo que dijo en español."})
+                else:
+                    content.append({"type": "text", "text": "The user just spoke to you. Respond to what they said."})
             elif msg.get("image"):
-                content.append({"type": "text", "text": "The user is showing you their camera. Describe what you see."})
+                if language == "es":
+                    content.append({"type": "text", "text": "El usuario te está mostrando su cámara. Describe lo que ves en español."})
+                else:
+                    content.append({"type": "text", "text": "The user is showing you their camera. Describe what you see."})
             else:
-                content.append({"type": "text", "text": msg.get("text", "Hello!")})
+                default_text = "¡Hola!" if language == "es" else "Hello!"
+                content.append({"type": "text", "text": msg.get("text", default_text)})
 
             # LLM inference
             t0 = time.time()
             tool_result.clear()
             response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: conversation.send_message({"role": "user", "content": content})
+                engine_executor, lambda: conversation.send_message({"role": "user", "content": content})
             )
             llm_time = time.time() - t0
 
@@ -194,6 +314,9 @@ async def websocket_endpoint(ws: WebSocket):
                 "sentence_count": len(sentences),
             }))
 
+            tts_voice = "ef_dora" if language == "es" else "af_heart"
+            tts_lang = "es" if language == "es" else "en"
+
             for i, sentence in enumerate(sentences):
                 if interrupted.is_set():
                     print(f"Interrupted during TTS (sentence {i+1}/{len(sentences)})")
@@ -201,7 +324,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Generate audio for this sentence
                 pcm = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda s=sentence: tts_backend.generate(s)
+                    None, lambda s=sentence: tts_backend.generate(s, voice=tts_voice, lang_code=tts_lang)
                 )
 
                 if interrupted.is_set():
@@ -228,7 +351,12 @@ async def websocket_endpoint(ws: WebSocket):
         print("Client disconnected")
     finally:
         recv_task.cancel()
-        conversation.__exit__(None, None, None)
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                engine_executor, lambda: conversation.__exit__(None, None, None)
+            )
+        except Exception as e:
+            print(f"Error exiting conversation: {e}")
 
 
 if __name__ == "__main__":
